@@ -1,94 +1,49 @@
 import pygame 
+import random
+# from.bird import Bird
 from .config import *
 
-class BasePipe:
-    def __init__(self, y, sprite=None):
-        self.x = PIPE_SPAWN_X
-        self.y = y
-        self.height = WINDOW_HEIGHT - y  # Default height
-        
-        if sprite:
-            # Scale width only, keeping aspect ratio
-            orig_width, orig_height = sprite.get_size()
-            scale_factor = PIPE_WIDTH / orig_width
-            scaled_height = int(orig_height * scale_factor)
-            
-            # Scale sprite to match pipe width
-            self.sprite_segment = pygame.transform.scale(
-                sprite,
-                (PIPE_WIDTH, scaled_height)
-            )
-        else:
-            self.sprite_segment = None
-            
-        self.rect = pygame.Rect(self.x, y, PIPE_WIDTH, self.height)
-        self.scored = False
+class Pipe:
+    GAP = 200
+    VEL = 5
 
-    def update(self):
-        self.x -= PIPE_SPEED  # Update the x position first
-        self.rect.x = self.x  # Then update the rect position
+    def __init__(self, x):
+        self.x = x
+        self.height = 0 
+
+        self.top = 0
+        self.bottom = 0
+        self.PIPE_TOP = PIPE_IMG
+        self.PIPE_BOTTOM = pygame.transform.flip(PIPE_IMG, False, True)
+
+        self.passed = False
+        self.set_height()
+
+    def set_height(self):
+        self.height = random.randrange(50, 450)
+        self.top = self.height - self.PIPE_TOP.get_height()
+        self.bottom = self.height + self.GAP
+
+    def move(self):
+        self.x -= self.VEL
 
     def draw(self, screen):
-        if self.sprite_segment:
-            # Calculate area to clip from sprite
-            clip_rect = pygame.Rect(
-                0,                          # x start of clip
-                0,                          # y start of clip
-                PIPE_WIDTH,                 # width of clip
-                min(self.height,           # Take whichever is smaller:
-                    self.sprite_segment.get_height())  # sprite height or pipe height
-            )
-            
-            # Draw only the clipped portion
-            screen.blit(
-                self.sprite_segment,        # source surface
-                (self.x, self.y),          # destination position
-                clip_rect                   # area to clip from source
-            )
-        else:
-            pygame.draw.rect(screen, (0, 255, 0), self.rect)  # Draw green rectangle
+        screen.blit(self.PIPE_BOTTOM, (self.x, self.top))
+        screen.blit(self.PIPE_TOP, (self.x, self.bottom))
 
-    def is_off_screen(self):
-        return self.x + PIPE_WIDTH < 0
+    def collide(self, bird):
+        bird_mask = bird.get_mask()
+        top_mask = pygame.mask.from_surface(self.PIPE_TOP)
+        bottom_mask = pygame.mask.from_surface(self.PIPE_BOTTOM)
 
+        top_offset = (self.x - bird.x, self.top - round(bird.y))
+        bottom_offset = (self.x - bird.x, self.bottom - round(bird.y))
 
-class TopPipe(BasePipe):
-    def __init__(self, y, sprite=None):
-        super().__init__(y, sprite)
-        # Top pipe extends from top (y=0) down to gap position
-        self.y = 0  # Start at top of screen
-        self.height = y  # Height is the distance to the gap
-        self.rect = pygame.Rect(self.x, self.y, PIPE_WIDTH, self.height)
+        b_point = bird_mask.overlap(bottom_mask, bottom_offset)
+        t_point = bird_mask.overlap(top_mask, top_offset)
+
+        if t_point or b_point:
+            return True
         
-        # Flip sprite after base initialization is complete
-        if self.sprite_segment:
-            self.sprite_segment = pygame.transform.flip(self.sprite_segment, False, True)
-            
-    def draw(self, screen):
-        if self.sprite_segment:
-            # For top pipe, we draw from top down
-            clip_height = min(self.height, self.sprite_segment.get_height())
-            clip_rect = pygame.Rect(
-            0,
-            self.sprite_segment.get_height() - clip_height,  # Clip from bottom of flipped sprite
-            PIPE_WIDTH,
-            clip_height
-            )
+        return False
 
-            
-            # Draw the flipped sprite starting from the top (y=0)
-            screen.blit(
-                self.sprite_segment,
-                (self.x, 0),  # Always start at top of screen
-                clip_rect
-            )
-        else:
-            pygame.draw.rect(screen, (0, 255, 0), self.rect)
-
-
-class BottomPipe(BasePipe):
-    def __init__(self, y, sprite=None):
-        super().__init__(y, sprite)
-        # Bottom pipe extends from gap position to bottom of screen
-        self.height = WINDOW_HEIGHT - y
-        self.rect = pygame.Rect(self.x, y, PIPE_WIDTH, self.height)

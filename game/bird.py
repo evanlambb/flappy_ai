@@ -2,51 +2,71 @@ import pygame
 from .config import *
 
 class Bird:
-    def __init__(self, x, y, sprite=None):
+    IMGS = BIRD_IMGS
+    MAX_ROTATION = 25
+    ROT_VEL = 20
+    ANIMATION_TIME = 5
+
+
+    def __init__(self, x, y):
         self.x = x
         self.y = y
+        self.tilt = 0
+        self.tick_count = 0
         self.velocity = 0
-        self.sprite = sprite
-        self.rotated_sprite = sprite
-        self.angle = 0  # 0 degrees is horizontal
-        if sprite:
-            self.rect = sprite.get_rect(center=(x, y))
-        else:
-            self.rect = pygame.Rect(x, y, BIRD_WIDTH, BIRD_HEIGHT)
+        self.height = self.y
+        self.img_count = 0
+        self.img = self.IMGS[0]
+        
 
     def jump(self):
         self.velocity = -JUMP_SPEED
-        self.angle = 45  # Point upward when jumping
+        self.tick_count = 0
+        self.height = self.y
 
-    def update(self):
-        # Apply gravity
-        self.velocity += GRAVITY
-        
-        # Update position
-        self.y += self.velocity
-        
-        # Update rotation based on velocity
-        if self.velocity < 0:  # Moving upward
-            self.angle = 30
-        else:  # Falling
-            # Gradually rotate downward
-            self.angle = max(-90, 30 - self.velocity * 4)
-        
-        # Update collision rect
-        self.rect.y = self.y
+    def move(self):
+        self.tick_count += 1
+        d = self.velocity * self.tick_count + 1.5 * self.tick_count ** 2 # Gravity
+
+        if d >= 16:
+            d = 16
+        if d < 0:
+            d -= 2
+
+        self.y += d
+
+        if d < 0 or self.y < self.height + 50:
+            if self.tilt < self.MAX_ROTATION:
+                self.tilt = self.MAX_ROTATION
+
+        else:
+            if self.tilt > -90:
+                self.tilt -= self.ROT_VEL
+
 
     def draw(self, screen):
-        if self.sprite:
-            # Store center position before rotation
-            center = self.rect.center
-            
-            # Rotate sprite
-            self.rotated_sprite = pygame.transform.rotate(self.sprite, self.angle)
-            
-            # Get new rect and maintain center position
-            self.rect = self.rotated_sprite.get_rect(center=center)
-            
-            # Draw rotated sprite
-            screen.blit(self.rotated_sprite, self.rect)
-        else:
-            pygame.draw.rect(screen, (255, 255, 0), self.rect)
+        self.img_count += 1
+
+        if self.img_count < self.ANIMATION_TIME:
+            self.img = self.IMGS[0]
+        elif self.img_count < self.ANIMATION_TIME * 2:
+            self.img = self.IMGS[1]
+        elif self.img_count < self.ANIMATION_TIME * 3:
+            self.img = self.IMGS[2]
+        elif self.img_count < self.ANIMATION_TIME * 4:
+            self.img = self.IMGS[1]
+        elif self.img_count == self.ANIMATION_TIME * 4 + 1:
+            self.img = self.IMGS[0]
+            self.img_count = 0
+
+        if self.tilt <= -80:
+            self.img = self.IMGS[1]
+            self.img_count = self.ANIMATION_TIME*2
+
+        rotated_image = pygame.transform.rotate(self.img, self.tilt)
+        new_rect = rotated_image.get_rect(center=self.img.get_rect(topleft = (self.x, self.y)).center)
+
+        screen.blit(rotated_image, new_rect.topleft)
+
+    def get_mask(self):
+        return pygame.mask.from_surface(self.img)
